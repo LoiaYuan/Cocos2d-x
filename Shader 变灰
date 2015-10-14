@@ -1,0 +1,107 @@
+Sprite图片变灰或者ImageView图片变灰 实现，很全面   
+
+没事就总结了下图片变灰功能，这里提供了2种方式：
+
+
+第一种：
+这种方式是最普遍的，就是直接修改图片的rgb值实现的，这种方式有个弊端，就是需要变灰的精灵必须是Sprite类型才可以，代码如下
+
+void HelloWorld::spriteToGrey(Sprite* sprite_chess)
+{
+    Point point = sprite_chess->getPosition();
+    sprite_chess->setPosition(sprite_chess->getContentSize().width / 2, sprite_chess->getContentSize().height / 2);
+RenderTexture *render = RenderTexture::create(sprite_chess->getContentSize().width, sprite_chess->getContentSize().height, Texture2D::PixelFormat::RGBA8888);
+    render->beginWithClear(0.0f, 0.0f, 0.0f, 0.0f);
+    sprite_chess->visit();
+    render->end();
+Director::getInstance()->getRenderer()->render();
+    Image *finalImage = render->newImage();
+    unsigned char *pData = finalImage->getData();
+    int iIndex = 0;
+    for (int i = 0; i < finalImage->getHeight(); i++)
+    {
+        for (int j = 0; j < finalImage->getWidth(); j++)
+        {
+            // gray
+            int iBPos = iIndex;
+            unsigned int iB = pData[iIndex];
+            iIndex++;
+            unsigned int iG = pData[iIndex];
+            iIndex++;
+            unsigned int iR = pData[iIndex];
+            iIndex++;
+            iIndex++;
+            unsigned int iGray = 0.3 * iR + 0.6 * iG + 0.1 * iB;
+            pData[iBPos] = pData[iBPos + 1] = pData[iBPos + 2] = (unsigned char)iGray;
+        }
+    }
+
+    Texture2D *texture = new Texture2D;
+    texture->initWithImage(finalImage);
+    delete finalImage;
+
+    sprite_chess->setTexture(texture);
+    texture->release();
+    sprite_chess->setPosition(point);
+}
+
+
+
+
+第二种：
+这种方式是通过shader实现变灰的，功能非常强大，支持Sprite和ImageView类型的图片变灰，已测试无任何问题(变灰后图片位置也不会偏移)，代码如下：
+
+
+//实现Sprite或者ImageView类型的图片变灰（已修正位置偏移问题）
+void HelloWorld::spriteToGrey2(Node* tempSp)
+{
+    ImageView* imgView=dynamic_cast<ImageView*>(tempSp);
+    Sprite* imgView2=dynamic_cast<Sprite*>(tempSp);
+    Sprite* sp=nullptr;
+    if (imgView) {
+Scale9Sprite* scale9sp=dynamic_cast<Scale9Sprite*>(imgView->getVirtualRenderer());
+        if(scale9sp){
+            sp=scale9sp->getSprite();
+        }
+
+
+    } else if(imgView2){
+        sp=imgView2;
+    }
+    if (!sp) {
+        return;
+    }
+
+    const GLchar* pszFragSource =
+"#ifdef GL_ES \n\
+    precision mediump float; \n\
+#endif \n\
+    varying vec2 v_texCoord; \n\
+    varying vec4 v_fragmentColor; \n\
+    void main(void) \n\
+    { \n\
+        // Convert to greyscale using NTSC weightings \n\
+        vec4 col = v_fragmentColor * texture2D(CC_Texture0, v_texCoord); \n\
+        float grey = dot(col.rgb, vec3(0.299, 0.587, 0.114)); \n\
+        gl_FragColor = vec4(grey, grey, grey, col.a); \n\
+    }";
+    GLProgram* pProgram = new GLProgram();
+    pProgram->initWithByteArrays(ccPositionTextureColor_noMVP_vert, pszFragSource);
+    sp->setGLProgram(pProgram);
+    pProgram->release();
+CHECK_GL_ERROR_DEBUG();
+    sp->getGLProgram()->bindAttribLocation(GLProgram::ATTRIBUTE_NAME_POSITION, GLProgram::VERTEX_ATTRIB_POSITION);
+    sp->getGLProgram()->bindAttribLocation(GLProgram::ATTRIBUTE_NAME_COLOR, GLProgram::VERTEX_ATTRIB_COLOR);
+    sp->getGLProgram()->bindAttribLocation(GLProgram::ATTRIBUTE_NAME_TEX_COORD, GLProgram::VERTEX_ATTRIB_TEX_COORD);
+CHECK_GL_ERROR_DEBUG();
+    sp->getGLProgram()->link();
+CHECK_GL_ERROR_DEBUG();
+    sp->getGLProgram()->updateUniforms();
+CHECK_GL_ERROR_DEBUG();
+
+}
+
+
+
+
+测试环境是：cocos2dx 3.6版本
