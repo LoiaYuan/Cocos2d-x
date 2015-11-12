@@ -1,0 +1,8 @@
+//获取系统时间
+	//struct timeval now;
+	//struct tm *time;
+	//gettimeofday(&now, NULL);
+	//time_t timep = now.tv_sec;
+	//time = localtime(&timep);     
+	//int time_day = (int)time->tm_mday;
+	//int last_time = UserDefault::getInstance()->getIntegerForKey("last_login_time_day");
